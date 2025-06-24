@@ -84,6 +84,90 @@ Verify the installation by running:
 ./upload_transcriptions.sh --help
 ```
 
+## Updating
+
+### Git-based Installation (Recommended)
+
+#### Method 1: Clean Update (Preserves Config)
+```bash
+cd upload_transcription_jw_player
+
+# Backup your config file
+cp config.json config.json.backup
+
+# Check for local changes
+git status
+
+# If you have uncommitted changes to config.json only:
+git stash push -m "backup local config" config.json
+
+# Pull latest updates
+git pull origin main
+
+# Restore your config
+git stash pop
+# OR if stash fails:
+cp config.json.backup config.json
+```
+
+#### Method 2: Force Update (When Conflicts Occur)
+```bash
+cd upload_transcription_jw_player
+
+# Backup your config file
+cp config.json config.json.backup
+
+# Reset to match remote exactly
+git fetch origin main
+git reset --hard origin/main
+
+# Restore your config
+cp config.json.backup config.json
+```
+
+#### Method 3: Fresh Clone
+```bash
+# Backup your config
+cp upload_transcription_jw_player/config.json config.json.backup
+
+# Remove old installation
+rm -rf upload_transcription_jw_player
+
+# Fresh clone
+git clone https://github.com/PeerHoffmann/upload_transcription_jw_player.git
+cd upload_transcription_jw_player
+chmod +x upload_transcriptions.sh
+
+# Restore your config
+cp ../config.json.backup config.json
+```
+
+### Direct Download Installation
+For non-git installations:
+```bash
+# Backup your config
+cp config.json config.json.backup
+
+# Download latest version
+wget https://github.com/PeerHoffmann/upload_transcription_jw_player/archive/main.zip
+unzip main.zip
+
+# Replace script files
+cp upload_transcription_jw_player-main/upload_transcriptions.sh .
+chmod +x upload_transcriptions.sh
+
+# Clean up
+rm -rf upload_transcription_jw_player-main main.zip
+
+# Restore your config
+cp config.json.backup config.json
+```
+
+### Verify Update
+```bash
+./upload_transcriptions.sh --version
+```
+
 ## Configuration
 
 ### Initial Setup
