@@ -56,24 +56,24 @@ sudo apk add curl jq git bash
 
 #### Method 1: Git Clone (Recommended)
 ```bash
-git clone https://github.com/yourusername/jw-player-vtt-upload.git
-cd jw-player-vtt-upload
+git clone https://github.com/PeerHoffmann/upload_transcription_jw_player.git
+cd upload_transcription_jw_player
 chmod +x upload_transcriptions.sh
 ```
 
 #### Method 2: Direct Download
 ```bash
-wget https://github.com/yourusername/jw-player-vtt-upload/archive/main.zip
+wget https://github.com/PeerHoffmann/upload_transcription_jw_player/archive/main.zip
 unzip main.zip
-cd jw-player-vtt-upload-main
+cd upload_transcription_jw_player-main
 chmod +x upload_transcriptions.sh
 ```
 
 #### Method 3: Manual Installation
 ```bash
-mkdir jw-player-vtt-upload
-cd jw-player-vtt-upload
-# Download files manually and set permissions
+mkdir upload_transcription_jw_player
+cd upload_transcription_jw_player
+# Download files manually from https://github.com/PeerHoffmann/upload_transcription_jw_player
 chmod +x upload_transcriptions.sh
 ```
 
