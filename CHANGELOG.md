@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2025-06-24
+
+### Fixed
+- Increase connection timeout values to prevent HTTP 000000 errors
+- Simplify metadata field to use empty JSON with proper content-type header
+- Improve connection error messages and debugging information
+
+### Changed
+- Increase connect-timeout from 30s to 60s for better reliability
+- Increase max-time from 90s to 180s for large file uploads
+- Use simplified metadata format: `{};type=application/json`
+
 ## [1.0.4] - 2025-06-24
 
 ### Fixed

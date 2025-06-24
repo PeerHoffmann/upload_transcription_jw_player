@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="1.0.4"
+VERSION="1.0.5"
 SCRIPT_NAME="upload_transcriptions.sh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_CONFIG="${SCRIPT_DIR}/config.json"
@@ -404,14 +404,14 @@ upload_vtt_file() {
             -X POST \
             -H "Authorization: Bearer $API_KEY" \
             -H "User-Agent: $SCRIPT_NAME/$VERSION" \
-            -F 'metadata={"language":"'$language'","type":"'$kind'","title":"'$label'"}' \
+            -F 'metadata={};type=application/json' \
             -F "kind=$kind" \
             -F "srclang=$language" \
             -F "label=$label" \
             -F "default=$is_default" \
             -F "file=@$vtt_file" \
-            --connect-timeout "$TIMEOUT" \
-            --max-time $((TIMEOUT * 3)) \
+            --connect-timeout 60 \
+            --max-time 180 \
             --retry 0 \
             -o "$temp_file" \
             "$url")
@@ -451,7 +451,8 @@ upload_vtt_file() {
                 return 1
                 ;;
             000)
-                log_error "Connection timeout for $vtt_file (attempt $attempt) - check network connectivity"
+                log_error "Connection failed for $vtt_file (attempt $attempt) - curl exit code indicates network/SSL issue"
+                log_debug "Check: 1) Network connectivity 2) SSL certificates 3) Firewall/proxy settings"
                 if [[ $attempt -lt $MAX_RETRIES ]]; then
                     sleep "$backoff_delay"
                     backoff_delay=$((backoff_delay * 2))
