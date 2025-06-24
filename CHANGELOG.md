@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2025-06-24
+
+### Fixed
+- Comprehensive fix for metadata field handling in JW Player API requests
+- Add automatic fallback to upload without metadata field if API rejects it
+- Improve metadata JSON formatting with proper shell quoting
+- Move metadata field to top of form data for better API compatibility
+
+### Added
+- Enhanced debug logging showing exact curl commands being executed
+- Automatic retry mechanism without metadata field for compatibility
+- Better error messages for metadata-related API failures
+
+### Changed
+- Improved error handling for HTTP 400 "metadata is required" responses
+
 ## [1.0.3] - 2025-06-24
 
 ### Fixed

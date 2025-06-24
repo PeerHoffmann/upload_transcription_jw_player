@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="1.0.2"
+VERSION="1.0.4"
 SCRIPT_NAME="upload_transcriptions.sh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_CONFIG="${SCRIPT_DIR}/config.json"
@@ -384,6 +384,15 @@ upload_vtt_file() {
     
     while [[ $attempt -le $MAX_RETRIES ]]; do
         log_debug "Upload attempt $attempt/$MAX_RETRIES for $vtt_file ($(basename "$vtt_file"))"
+        log_debug "Request fields: kind=$kind, srclang=$language, label=$label, default=$is_default"
+        log_debug "Metadata: {\"language\":\"$language\",\"type\":\"$kind\",\"title\":\"$label\"}"
+        log_debug "URL: $url"
+        
+        # Debug: Show exact curl command being executed
+        if [[ "$VERBOSE" == "true" ]]; then
+            log_debug "Executing curl command:"
+            log_debug "curl -s -w '%{http_code}' -X POST -H 'Authorization: Bearer [HIDDEN]' -H 'User-Agent: $SCRIPT_NAME/$VERSION' -F 'metadata={\"language\":\"$language\",\"type\":\"$kind\",\"title\":\"$label\"}' -F 'kind=$kind' -F 'srclang=$language' -F 'label=$label' -F 'default=$is_default' -F 'file=@$vtt_file' '$url'"
+        fi
         
         check_rate_limit
         
@@ -395,11 +404,11 @@ upload_vtt_file() {
             -X POST \
             -H "Authorization: Bearer $API_KEY" \
             -H "User-Agent: $SCRIPT_NAME/$VERSION" \
+            -F 'metadata={"language":"'$language'","type":"'$kind'","title":"'$label'"}' \
             -F "kind=$kind" \
             -F "srclang=$language" \
             -F "label=$label" \
             -F "default=$is_default" \
-            -F "metadata={\"language\":\"$language\",\"type\":\"$kind\",\"title\":\"$label\"}" \
             -F "file=@$vtt_file" \
             --connect-timeout "$TIMEOUT" \
             --max-time $((TIMEOUT * 3)) \
@@ -443,6 +452,41 @@ upload_vtt_file() {
                 ;;
             000)
                 log_error "Connection timeout for $vtt_file (attempt $attempt) - check network connectivity"
+                if [[ $attempt -lt $MAX_RETRIES ]]; then
+                    sleep "$backoff_delay"
+                    backoff_delay=$((backoff_delay * 2))
+                else
+                    return 1
+                fi
+                ;;
+            400)
+                if [[ "$body" == *"metadata is required"* ]]; then
+                    log_warn "Metadata field rejected, trying without metadata (attempt $attempt)"
+                    # Retry without metadata field
+                    local http_code_retry=$(curl -s -w "%{http_code}" \
+                        -X POST \
+                        -H "Authorization: Bearer $API_KEY" \
+                        -H "User-Agent: $SCRIPT_NAME/$VERSION" \
+                        -F "kind=$kind" \
+                        -F "srclang=$language" \
+                        -F "label=$label" \
+                        -F "default=$is_default" \
+                        -F "file=@$vtt_file" \
+                        --connect-timeout "$TIMEOUT" \
+                        --max-time $((TIMEOUT * 3)) \
+                        --retry 0 \
+                        -o "$temp_file" \
+                        "$url")
+                    
+                    if [[ "$http_code_retry" == "201" ]]; then
+                        log_info "Successfully uploaded $(basename "$vtt_file") without metadata to media ID $media_id (${duration}s)"
+                        return 0
+                    else
+                        local body_retry=$(cat "$temp_file" 2>/dev/null || echo "")
+                        log_error "Upload failed even without metadata (HTTP $http_code_retry): ${body_retry:0:200}"
+                    fi
+                fi
+                
                 if [[ $attempt -lt $MAX_RETRIES ]]; then
                     sleep "$backoff_delay"
                     backoff_delay=$((backoff_delay * 2))
