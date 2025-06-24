@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="1.0.5"
+VERSION="1.1.0"
 SCRIPT_NAME="upload_transcriptions.sh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_CONFIG="${SCRIPT_DIR}/config.json"
@@ -259,6 +259,13 @@ extract_media_id() {
         return 1
     fi
     
+    # Remove common suffixes like _audio, _video, _transcript, _captions
+    basename=${basename%_audio}
+    basename=${basename%_video}
+    basename=${basename%_transcript}
+    basename=${basename%_captions}
+    basename=${basename%_subtitles}
+    
     if [[ "$basename" =~ ^[a-zA-Z0-9_-]+$ ]]; then
         echo "$basename"
         return 0
@@ -341,6 +348,233 @@ verify_media_exists() {
     esac
 }
 
+check_existing_text_tracks() {
+    local media_id="$1"
+    local kind="$2"
+    
+    local url="${BASE_URL}/v2/sites/${SITE_ID}/media/${media_id}/text_tracks/"
+    
+    check_rate_limit
+    
+    local temp_file=$(mktemp)
+    trap "rm -f '$temp_file'" RETURN
+    
+    log_debug "Checking existing text tracks for media ID $media_id"
+    
+    local http_code=$(curl -s -w "%{http_code}" \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "User-Agent: $SCRIPT_NAME/$VERSION" \
+        -H "Accept: application/json" \
+        --connect-timeout 30 \
+        --max-time 60 \
+        --retry 1 \
+        -o "$temp_file" \
+        "$url")
+    
+    local body=$(cat "$temp_file" 2>/dev/null || echo "")
+    
+    case "$http_code" in
+        200)
+            # Check if there are existing tracks of the same kind
+            local existing_tracks=$(echo "$body" | jq -r --arg kind "$kind" '.text_tracks[] | select(.track_kind == $kind) | .id' 2>/dev/null || echo "")
+            if [[ -n "$existing_tracks" ]]; then
+                echo "$existing_tracks"
+                return 0
+            else
+                return 1
+            fi
+            ;;
+        401|403)
+            log_error "Authentication failed while checking text tracks for media ID $media_id"
+            return 2
+            ;;
+        404)
+            log_error "Media ID $media_id not found"
+            return 2
+            ;;
+        *)
+            log_error "Failed to check text tracks for media ID $media_id (HTTP $http_code): ${body:0:200}"
+            return 2
+            ;;
+    esac
+}
+
+delete_text_track() {
+    local media_id="$1"
+    local track_id="$2"
+    
+    local url="${BASE_URL}/v2/sites/${SITE_ID}/media/${media_id}/text_tracks/${track_id}/"
+    
+    check_rate_limit
+    
+    local temp_file=$(mktemp)
+    trap "rm -f '$temp_file'" RETURN
+    
+    log_debug "Deleting text track $track_id for media ID $media_id"
+    
+    local http_code=$(curl -s -w "%{http_code}" \
+        -X DELETE \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "User-Agent: $SCRIPT_NAME/$VERSION" \
+        --connect-timeout 30 \
+        --max-time 60 \
+        --retry 1 \
+        -o "$temp_file" \
+        "$url")
+    
+    local body=$(cat "$temp_file" 2>/dev/null || echo "")
+    
+    case "$http_code" in
+        204)
+            log_debug "Successfully deleted text track $track_id"
+            return 0
+            ;;
+        404)
+            log_warn "Text track $track_id not found (may have been already deleted)"
+            return 0
+            ;;
+        401|403)
+            log_error "Authentication failed while deleting text track $track_id"
+            return 1
+            ;;
+        *)
+            log_error "Failed to delete text track $track_id (HTTP $http_code): ${body:0:200}"
+            return 1
+            ;;
+    esac
+}
+
+create_text_track() {
+    local media_id="$1"
+    local language="$2"
+    local kind="$3"
+    local label="$4"
+    local is_default="$5"
+    
+    local url="${BASE_URL}/v2/sites/${SITE_ID}/media/${media_id}/text_tracks/"
+    
+    check_rate_limit
+    
+    local temp_file=$(mktemp)
+    trap "rm -f '$temp_file'" RETURN
+    
+    local json_data="{
+        \"upload\": {
+            \"auto_publish\": true,
+            \"method\": \"direct\",
+            \"file_format\": \"vtt\"
+        },
+        \"metadata\": {
+            \"track_kind\": \"$kind\",
+            \"label\": \"$label\"
+        }
+    }"
+    
+    log_debug "Creating text track for media ID $media_id with JSON: $json_data"
+    
+    local http_code=$(curl -s -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: Bearer $API_KEY" \
+        -H "User-Agent: $SCRIPT_NAME/$VERSION" \
+        -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        --connect-timeout 60 \
+        --max-time 180 \
+        --retry 0 \
+        -d "$json_data" \
+        -o "$temp_file" \
+        "$url")
+    
+    local body=$(cat "$temp_file" 2>/dev/null || echo "")
+    
+    case "$http_code" in
+        201)
+            local upload_link=$(echo "$body" | jq -r '.upload_link // empty')
+            if [[ -n "$upload_link" && "$upload_link" != "null" ]]; then
+                echo "$upload_link"
+                return 0
+            else
+                log_error "Text track created but no upload_link found in response: ${body:0:200}"
+                return 1
+            fi
+            ;;
+        409)
+            log_warn "Text track already exists for media ID $media_id"
+            return 1
+            ;;
+        401|403)
+            log_error "Authentication failed for media ID $media_id - check API key and permissions"
+            return 1
+            ;;
+        429)
+            log_error "Rate limit exceeded while creating text track for media ID $media_id"
+            return 1
+            ;;
+        000)
+            log_error "Connection failed while creating text track for media ID $media_id - check network connectivity"
+            return 1
+            ;;
+        *)
+            log_error "Failed to create text track for media ID $media_id (HTTP $http_code): ${body:0:200}"
+            return 1
+            ;;
+    esac
+}
+
+upload_to_s3() {
+    local vtt_file="$1"
+    local upload_url="$2"
+    
+    if [[ ! -f "$vtt_file" ]]; then
+        log_error "VTT file not found: $vtt_file"
+        return 1
+    fi
+    
+    if [[ ! -r "$vtt_file" ]]; then
+        log_error "VTT file not readable: $vtt_file"
+        return 1
+    fi
+    
+    local start_time=$(date +%s)
+    local temp_file=$(mktemp)
+    trap "rm -f '$temp_file'" RETURN
+    
+    log_debug "Uploading VTT file to S3: $upload_url"
+    
+    local http_code=$(curl -s -w "%{http_code}" \
+        -X PUT \
+        -T "$vtt_file" \
+        --connect-timeout 60 \
+        --max-time 300 \
+        --retry 2 \
+        --retry-delay 2 \
+        -o "$temp_file" \
+        "$upload_url")
+    
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local body=$(cat "$temp_file" 2>/dev/null || echo "")
+    
+    case "$http_code" in
+        200)
+            log_debug "Successfully uploaded VTT file to S3 (${duration}s)"
+            return 0
+            ;;
+        403)
+            log_error "S3 upload failed - signature issue or expired URL: ${body:0:200}"
+            return 1
+            ;;
+        000)
+            log_error "Connection failed during S3 upload - check network connectivity"
+            return 1
+            ;;
+        *)
+            log_error "S3 upload failed (HTTP $http_code): ${body:0:200}"
+            return 1
+            ;;
+    esac
+}
+
 upload_vtt_file() {
     local vtt_file="$1"
     local media_id="$2"
@@ -378,133 +612,69 @@ upload_vtt_file() {
         return 1
     fi
     
-    local url="${BASE_URL}/v2/sites/${SITE_ID}/media/${media_id}/text_tracks/"
     local attempt=1
     local backoff_delay="$RETRY_DELAY"
+    local start_time=$(date +%s)
     
     while [[ $attempt -le $MAX_RETRIES ]]; do
         log_debug "Upload attempt $attempt/$MAX_RETRIES for $vtt_file ($(basename "$vtt_file"))"
-        log_debug "Request fields: kind=$kind, srclang=$language, label=$label, default=$is_default"
-        log_debug "Metadata: {\"language\":\"$language\",\"type\":\"$kind\",\"title\":\"$label\"}"
-        log_debug "URL: $url"
+        log_debug "Creating text track: kind=$kind, language=$language, label=$label, default=$is_default"
         
-        # Debug: Show exact curl command being executed
-        if [[ "$VERBOSE" == "true" ]]; then
-            log_debug "Executing curl command:"
-            log_debug "curl -s -w '%{http_code}' -X POST -H 'Authorization: Bearer [HIDDEN]' -H 'User-Agent: $SCRIPT_NAME/$VERSION' -F 'metadata={\"language\":\"$language\",\"type\":\"$kind\",\"title\":\"$label\"}' -F 'kind=$kind' -F 'srclang=$language' -F 'label=$label' -F 'default=$is_default' -F 'file=@$vtt_file' '$url'"
+        # Step 0: Check for existing text tracks of the same kind
+        local existing_track_ids
+        local check_result
+        existing_track_ids=$(check_existing_text_tracks "$media_id" "$kind")
+        check_result=$?
+        
+        if [[ $check_result -eq 0 ]]; then
+            # Existing tracks found
+            if [[ "$FORCE" == "true" ]]; then
+                log_info "Found existing $kind track(s) for media ID $media_id, deleting due to --force flag"
+                while IFS= read -r track_id; do
+                    if [[ -n "$track_id" ]]; then
+                        if ! delete_text_track "$media_id" "$track_id"; then
+                            log_error "Failed to delete existing text track $track_id"
+                            break 2  # Break out of both while loops
+                        fi
+                    fi
+                done <<< "$existing_track_ids"
+            else
+                log_warn "Text track of kind '$kind' already exists for media ID $media_id (use --force to overwrite)"
+                return 0  # Skip upload, but consider it successful
+            fi
+        elif [[ $check_result -eq 2 ]]; then
+            # Error occurred while checking
+            log_error "Failed to check existing text tracks (attempt $attempt)"
+            break  # Don't retry on authentication/media not found errors
         fi
+        # check_result -eq 1 means no existing tracks, continue with upload
         
-        check_rate_limit
-        
-        local temp_file=$(mktemp)
-        trap "rm -f '$temp_file'" RETURN
-        
-        local start_time=$(date +%s)
-        local http_code=$(curl -s -w "%{http_code}" \
-            -X POST \
-            -H "Authorization: Bearer $API_KEY" \
-            -H "User-Agent: $SCRIPT_NAME/$VERSION" \
-            -F 'metadata={};type=application/json' \
-            -F "kind=$kind" \
-            -F "srclang=$language" \
-            -F "label=$label" \
-            -F "default=$is_default" \
-            -F "file=@$vtt_file" \
-            --connect-timeout 60 \
-            --max-time 180 \
-            --retry 0 \
-            -o "$temp_file" \
-            "$url")
-        
-        local end_time=$(date +%s)
-        local duration=$((end_time - start_time))
-        local body=$(cat "$temp_file" 2>/dev/null || echo "")
-        
-        case "$http_code" in
-            201)
+        # Step 1: Create text track and get upload URL
+        local upload_url
+        if upload_url=$(create_text_track "$media_id" "$language" "$kind" "$label" "$is_default"); then
+            log_debug "Text track created, upload URL received"
+            
+            # Step 2: Upload VTT file to S3
+            if upload_to_s3 "$vtt_file" "$upload_url"; then
+                local end_time=$(date +%s)
+                local duration=$((end_time - start_time))
                 log_info "Successfully uploaded $(basename "$vtt_file") to media ID $media_id (${duration}s)"
                 return 0
-                ;;
-            409)
-                if [[ "$FORCE" != "true" ]]; then
-                    log_warn "Transcription already exists for media ID $media_id (use --force to overwrite)"
-                    return 0
-                else
-                    log_info "Overwriting existing transcription for media ID $media_id"
-                fi
-                ;;
-            429)
-                log_warn "Rate limit exceeded (attempt $attempt), waiting ${backoff_delay}s before retry"
-                sleep "$backoff_delay"
-                backoff_delay=$((backoff_delay * 2))
-                ;;
-            401|403)
-                log_error "Authentication failed for media ID $media_id - check API key and permissions"
-                return 1
-                ;;
-            413)
-                log_error "File too large: $vtt_file ($(( file_size / 1024 ))KB)"
-                return 1
-                ;;
-            422)
-                log_error "Invalid VTT file format: $vtt_file - ${body:0:200}"
-                return 1
-                ;;
-            000)
-                log_error "Connection failed for $vtt_file (attempt $attempt) - curl exit code indicates network/SSL issue"
-                log_debug "Check: 1) Network connectivity 2) SSL certificates 3) Firewall/proxy settings"
-                if [[ $attempt -lt $MAX_RETRIES ]]; then
-                    sleep "$backoff_delay"
-                    backoff_delay=$((backoff_delay * 2))
-                else
-                    return 1
-                fi
-                ;;
-            400)
-                if [[ "$body" == *"metadata is required"* ]]; then
-                    log_warn "Metadata field rejected, trying without metadata (attempt $attempt)"
-                    # Retry without metadata field
-                    local http_code_retry=$(curl -s -w "%{http_code}" \
-                        -X POST \
-                        -H "Authorization: Bearer $API_KEY" \
-                        -H "User-Agent: $SCRIPT_NAME/$VERSION" \
-                        -F "kind=$kind" \
-                        -F "srclang=$language" \
-                        -F "label=$label" \
-                        -F "default=$is_default" \
-                        -F "file=@$vtt_file" \
-                        --connect-timeout "$TIMEOUT" \
-                        --max-time $((TIMEOUT * 3)) \
-                        --retry 0 \
-                        -o "$temp_file" \
-                        "$url")
-                    
-                    if [[ "$http_code_retry" == "201" ]]; then
-                        log_info "Successfully uploaded $(basename "$vtt_file") without metadata to media ID $media_id (${duration}s)"
-                        return 0
-                    else
-                        local body_retry=$(cat "$temp_file" 2>/dev/null || echo "")
-                        log_error "Upload failed even without metadata (HTTP $http_code_retry): ${body_retry:0:200}"
-                    fi
-                fi
-                
-                if [[ $attempt -lt $MAX_RETRIES ]]; then
-                    sleep "$backoff_delay"
-                    backoff_delay=$((backoff_delay * 2))
-                else
-                    return 1
-                fi
-                ;;
-            *)
-                log_error "Upload failed for $vtt_file (HTTP $http_code): ${body:0:200}"
-                if [[ $attempt -lt $MAX_RETRIES ]]; then
-                    sleep "$backoff_delay"
-                    backoff_delay=$((backoff_delay * 2))
-                else
-                    return 1
-                fi
-                ;;
-        esac
+            else
+                log_error "Failed to upload VTT file to S3 (attempt $attempt)"
+            fi
+        else
+            log_error "Failed to create text track (attempt $attempt)"
+        fi
+        
+        if [[ $attempt -lt $MAX_RETRIES ]]; then
+            log_warn "Upload failed (attempt $attempt), waiting ${backoff_delay}s before retry"
+            sleep "$backoff_delay"
+            backoff_delay=$((backoff_delay * 2))
+        else
+            log_error "All upload attempts failed for $vtt_file"
+            return 1
+        fi
         
         ((attempt++))
     done
