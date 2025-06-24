@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-06-24
+
 ### Fixed
-- Fix "metadata is required" API error by adding properly formatted metadata field with JSON content-type to upload requests
+- Remove problematic metadata field from API requests to resolve upload errors
+- Update version number to reflect bug fixes
+
+### Changed
+- Simplified API request structure based on JW Player documentation
 
 ## [1.0.0] - 2025-06-23
 
