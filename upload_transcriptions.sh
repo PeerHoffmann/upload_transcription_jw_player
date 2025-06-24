@@ -399,6 +399,7 @@ upload_vtt_file() {
             -F "language=$language" \
             -F "label=$label" \
             -F "default=$is_default" \
+            -F "metadata={}" \
             -F "file=@$vtt_file" \
             --connect-timeout "$TIMEOUT" \
             --max-time $((TIMEOUT * 3)) \

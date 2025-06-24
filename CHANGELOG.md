@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fix "metadata is required" API error by adding empty metadata field to upload requests
+
 ## [1.0.0] - 2025-06-23
 
 ### Added
