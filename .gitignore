@@ -1,0 +1,60 @@
+# JW Player VTT Upload Tool - Git Ignore File
+
+# Development context file - never publish
+CLAUDE.md
+
+# Configuration files with sensitive data
+config.json
+*.config.json
+
+# Log files
+*.log
+logs/
+log/
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# VTT test files
+test*.vtt
+sample*.vtt
+example*.vtt
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cache directories
+.cache/
+cache/
+
+# Runtime files
+*.pid
+*.lock
+
+# Sensitive data
+secrets/
+credentials/
+keys/
+.env
+.env.*

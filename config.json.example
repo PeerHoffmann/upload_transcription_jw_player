@@ -1,0 +1,45 @@
+{
+  "api": {
+    "key": "enter_your_api_key_here",
+    "site_id": "enter_your_site_id_here",
+    "base_url": "https://api.jwplayer.com",
+    "rate_limit": {
+      "requests_per_minute": 60,
+      "retry_delay": 5
+    }
+  },
+  "paths": {
+    "vtt_directory": "/path/to/vtt/files",
+    "log_file": "/var/log/jw_upload.log"
+  },
+  "upload": {
+    "max_retries": 3,
+    "timeout": 30,
+    "chunk_size": 1024
+  },
+  "text_tracks": {
+    "default_language": "en",
+    "default_kind": "captions",
+    "default_label": "Auto-generated captions",
+    "set_as_default": false,
+    "supported_languages": [
+      "en", "es", "fr", "de", "it", "pt", "ja", "ko", "zh",
+      "ar", "ru", "hi", "th", "tr", "pl", "nl", "sv", "da",
+      "no", "fi", "el", "he", "cs", "sk", "hu", "ro", "bg",
+      "hr", "sr", "sl", "lv", "lt", "et", "mt", "ga", "cy"
+    ],
+    "supported_kinds": [
+      "captions",
+      "subtitles", 
+      "chapters",
+      "descriptions",
+      "metadata"
+    ]
+  },
+  "logging": {
+    "level": "info",
+    "include_timestamps": true,
+    "max_log_size": "10MB",
+    "rotate_logs": true
+  }
+}
