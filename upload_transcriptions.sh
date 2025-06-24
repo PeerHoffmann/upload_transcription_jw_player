@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 SCRIPT_NAME="upload_transcriptions.sh"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_CONFIG="${SCRIPT_DIR}/config.json"
@@ -396,9 +396,10 @@ upload_vtt_file() {
             -H "Authorization: Bearer $API_KEY" \
             -H "User-Agent: $SCRIPT_NAME/$VERSION" \
             -F "kind=$kind" \
-            -F "language=$language" \
+            -F "srclang=$language" \
             -F "label=$label" \
             -F "default=$is_default" \
+            -F "metadata={}" \
             -F "file=@$vtt_file" \
             --connect-timeout "$TIMEOUT" \
             --max-time $((TIMEOUT * 3)) \

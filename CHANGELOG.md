@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-06-24
+
+### Fixed
+- Fix API field name from 'language' to 'srclang' to match JW Player API specification
+- Add required metadata field to resolve upload errors
+- Correct API request structure based on JW Player documentation
+
 ## [1.0.1] - 2025-06-24
 
 ### Fixed
