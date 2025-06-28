@@ -1,3 +1,7 @@
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue)](https://www.paypal.me/peerhoffmann)
+
+If you find this project helpful, consider supporting me with a small donation.
+
 # JW Player VTT Transcription Upload Tool
 
 A production-ready bash script for automatically uploading VTT transcription files to JW Player via their Management API v2. Supports both single file and batch processing modes with comprehensive error handling, logging, and configuration management.
@@ -487,3 +491,12 @@ For issues, questions, or contributions:
 - Create an issue on GitHub
 - Check existing documentation
 - Review log files for error details
+
+---
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue)](https://www.paypal.me/peerhoffmann)
+
+If you find this project helpful, consider supporting me with a small donation.
+
+More information about me and my projects can be found at https://www.peer-hoffmann.de.
+
+If you need support with search engine optimization for your website, online shop, or international project, feel free to contact me at https://www.om96.de.
